@@ -3,6 +3,7 @@ import json
 import logging
 from dotenv import load_dotenv
 from web3 import Web3
+from eth_account import Account
 
 
 logging.basicConfig(
@@ -18,17 +19,19 @@ LISTER_PRIVATE_KEY = os.getenv("LISTER_PRIVATE_KEY")
 
 if not RPC_URL or not CONTRACT_ADDRESS or not LISTER_PRIVATE_KEY:
     logging.error("CRITICAL: Missing RPC_URL, CONTRACT_ADDRESS, or LISTER_PRIVATE_KEY in .env")
-    exit()
+    raise EnvironmentError("Missing required environment variables")
 
 
-try:
-    with open("Marketplace.json") as f:
-        abi_data = json.load(f)
-        CONTRACT_ABI = abi_data["abi"]
-except FileNotFoundError:
-    logging.error("CRITICAL: Marketplace.json (ABI file) not found.")
-    exit()
+def load_contract_abi(path="Marketplace.json"):
+    try:
+        with open(path) as f:
+            abi_data = json.load(f)
+            return abi_data["abi"]
+    except FileNotFoundError as e:
+        logging.error(f"Marketplace ABI file not found at {path}")
+        raise e
 
+CONTRACT_ABI = load_contract_abi("Marketplace.json")
 
 try:
     w3 = Web3(Web3.HTTPProvider(RPC_URL))
@@ -37,7 +40,7 @@ try:
 
     contract = w3.eth.contract(address=CONTRACT_ADDRESS, abi=CONTRACT_ABI)
     
-    lister_account = Web3.to_account(LISTER_PRIVATE_KEY)
+    lister_account = Account.from_key(LISTER_PRIVATE_KEY)
     LISTER_ADDRESS = lister_account.address
     
     logging.info(f"Config loaded. Connected to {RPC_URL}")
@@ -46,4 +49,4 @@ try:
 
 except Exception as e:
     logging.critical(f"Failed to initialize config: {e}", exc_info=True)
-    exit()
+    raise e
